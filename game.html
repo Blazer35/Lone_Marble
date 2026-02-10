@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Star Grid Game</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<h1>Star Grid</h1>
+<h2 id="turn">Player 1</h2>
+<p id="hint">Select a marble</p>
+
+<div id="board"></div>
+
+<div id="rules">
+  <h3>Rules</h3>
+  <ul>
+    <li>Two players take turns.</li>
+    <li>On your turn, remove <b>exactly one</b> full <b>row</b> or <b>column</b>.</li>
+    <li>You may only remove lines that still contain marbles.</li>
+    <li>The player who removes the <b>last marble loses</b>.</li>
+    <li><b>Center rule:</b> Removing a line through the center forces you to remove
+        an extra line of the opposite type.</li>
+    <li>You may not remove a line with only <b>one marble</b> unless no other move exists.</li>
+  </ul>
+</div>
+
+
+<div id="controls" class="hidden">
+  <button onclick="commitMove('row')">Remove Row</button>
+  <button onclick="commitMove('col')">Remove Column</button>
+</div>
+
+<button onclick="resetGame()">Restart</button>
+
+<script src="script.js"></script>
+</body>
+</html>
