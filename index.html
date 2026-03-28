@@ -2,23 +2,1399 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Lone Marble</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #07080f;
+      --bg2: #0d1020;
+      --panel: rgba(255,255,255,0.04);
+      --border: rgba(255,255,255,0.08);
+      --marble: #3a8cff;
+      --marble-glow: rgba(58,140,255,0.5);
+      --marble-removed: #1e2030;
+      --p1: #3a8cff;
+      --p1-glow: rgba(58,140,255,0.6);
+      --p2: #ff5e8a;
+      --p2-glow: rgba(255,94,138,0.6);
+      --row-hl: rgba(80,210,255,0.18);
+      --col-hl: rgba(100,255,160,0.18);
+      --diag1-hl: rgba(255,200,80,0.18);
+      --diag2-hl: rgba(200,80,255,0.18);
+      --row-ring: #50d2ff;
+      --col-ring: #64ffa0;
+      --diag1-ring: #ffc850;
+      --diag2-ring: #c850ff;
+      --text: #e8eaf6;
+      --text-dim: rgba(232,234,246,0.45);
+      --cell-size: 62px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Starfield */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        radial-gradient(1px 1px at 15% 20%, rgba(255,255,255,0.6) 0%, transparent 100%),
+        radial-gradient(1px 1px at 80% 10%, rgba(255,255,255,0.5) 0%, transparent 100%),
+        radial-gradient(1px 1px at 45% 55%, rgba(255,255,255,0.4) 0%, transparent 100%),
+        radial-gradient(1px 1px at 70% 75%, rgba(255,255,255,0.5) 0%, transparent 100%),
+        radial-gradient(1px 1px at 20% 85%, rgba(255,255,255,0.4) 0%, transparent 100%),
+        radial-gradient(1px 1px at 92% 40%, rgba(255,255,255,0.6) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 55% 30%, rgba(255,255,255,0.3) 0%, transparent 100%),
+        radial-gradient(1px 1px at 30% 50%, rgba(255,255,255,0.4) 0%, transparent 100%),
+        radial-gradient(2px 2px at 60% 90%, rgba(255,255,255,0.2) 0%, transparent 100%),
+        radial-gradient(1px 1px at 5% 60%, rgba(255,255,255,0.5) 0%, transparent 100%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Ambient glow blobs */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 40% 30% at 15% 50%, rgba(58,140,255,0.06) 0%, transparent 70%),
+        radial-gradient(ellipse 35% 25% at 85% 50%, rgba(255,94,138,0.06) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 640px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 12px 40px;
+      gap: 0;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 20px;
+    }
+
+    .header h1 {
+      font-family: 'Orbitron', monospace;
+      font-weight: 900;
+      font-size: clamp(22px, 6vw, 36px);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, #a8c8ff 0%, #ffffff 50%, #ffc8e8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 20px rgba(120,160,255,0.4));
+    }
+
+    .header .subtitle {
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+
+    /* Player panels */
+    .players {
+      display: flex;
+      gap: 12px;
+      width: 100%;
+      margin-bottom: 20px;
+    }
+
+    .player-card {
+      flex: 1;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .player-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      border-radius: 12px;
+    }
+
+    .player-card.p1::before { background: linear-gradient(135deg, rgba(58,140,255,0.12), transparent); }
+    .player-card.p2::before { background: linear-gradient(135deg, rgba(255,94,138,0.12), transparent); }
+
+    .player-card.active::before { opacity: 1; }
+
+    .player-card.active.p1 {
+      border-color: rgba(58,140,255,0.5);
+      box-shadow: 0 0 20px rgba(58,140,255,0.2), inset 0 0 20px rgba(58,140,255,0.05);
+    }
+    .player-card.active.p2 {
+      border-color: rgba(255,94,138,0.5);
+      box-shadow: 0 0 20px rgba(255,94,138,0.2), inset 0 0 20px rgba(255,94,138,0.05);
+    }
+
+    .player-label {
+      font-size: 9px;
+      letter-spacing: 0.25em;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      position: relative;
+    }
+
+    .player-name {
+      font-family: 'Orbitron', monospace;
+      font-weight: 700;
+      font-size: clamp(13px, 3.5vw, 18px);
+      position: relative;
+    }
+
+    .p1 .player-name { color: var(--p1); }
+    .p2 .player-name { color: var(--p2); }
+
+    .player-status {
+      font-size: 10px;
+      color: var(--text-dim);
+      position: relative;
+    }
+
+    .player-card.active .player-status { color: var(--text); }
+
+    .turn-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 2px;
+      position: relative;
+    }
+
+    .turn-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .p1 .turn-dot { background: var(--p1); box-shadow: 0 0 8px var(--p1-glow); }
+    .p2 .turn-dot { background: var(--p2); box-shadow: 0 0 8px var(--p2-glow); }
+    .player-card.active .turn-dot { opacity: 1; animation: pulse-dot 1.5s ease-in-out infinite; }
+
+    @keyframes pulse-dot {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.4); opacity: 0.7; }
+    }
+
+    /* Lock indicator */
+    .lock-badge {
+      display: none;
+      align-items: center;
+      gap: 5px;
+      background: rgba(255,200,80,0.12);
+      border: 1px solid rgba(255,200,80,0.3);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 11px;
+      color: #ffc850;
+      letter-spacing: 0.08em;
+      margin-bottom: 14px;
+      width: 100%;
+      justify-content: center;
+    }
+
+    .lock-badge.visible { display: flex; }
+    .lock-badge svg { flex-shrink: 0; }
+
+    /* Board container */
+    .board-wrap {
+      position: relative;
+      margin-bottom: 18px;
+    }
+
+    #board {
+      display: grid;
+      grid-template-columns: repeat(9, var(--cell-size));
+      grid-template-rows: repeat(7, var(--cell-size));
+      gap: 0;
+    }
+
+    .cell {
+      width: var(--cell-size);
+      height: var(--cell-size);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      cursor: pointer;
+    }
+
+    .cell.inactive {
+      cursor: default;
+      pointer-events: none;
+    }
+
+    /* Cell highlight backgrounds */
+    .cell.row-hover    { background: var(--row-hl); }
+    .cell.col-hover    { background: var(--col-hl); }
+    .cell.diag-hover   { background: var(--diag1-hl); }
+    .cell.diag2-hover  { background: var(--diag2-hl); }
+
+    /* Marble */
+    .marble {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      position: relative;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.2s ease;
+      background: radial-gradient(circle at 35% 30%,
+        rgba(255,255,255,0.95) 0%,
+        rgba(180,210,255,0.7) 15%,
+        #3a8cff 45%,
+        #1a3a8a 80%,
+        #0a1540 100%);
+      box-shadow:
+        inset -4px -6px 10px rgba(0,0,0,0.5),
+        0 4px 12px rgba(58,140,255,0.35),
+        0 0 0 0 rgba(58,140,255,0);
+      transform-origin: center;
+      flex-shrink: 0;
+    }
+
+    .marble::after {
+      content: '';
+      position: absolute;
+      top: 20%;
+      left: 22%;
+      width: 28%;
+      height: 18%;
+      background: rgba(255,255,255,0.6);
+      border-radius: 50%;
+      transform: rotate(-30deg);
+      filter: blur(1px);
+    }
+
+    .cell:hover .marble:not(.removed) {
+      transform: scale(1.12);
+      box-shadow:
+        inset -4px -6px 10px rgba(0,0,0,0.5),
+        0 6px 20px rgba(58,140,255,0.55),
+        0 0 0 3px rgba(58,140,255,0.2);
+    }
+
+    .marble.removed {
+      background: radial-gradient(circle at 40% 35%,
+        rgba(60,65,90,0.8) 0%,
+        rgba(30,32,48,0.9) 50%,
+        rgba(15,16,28,1) 100%);
+      box-shadow:
+        inset 0 4px 8px rgba(0,0,0,0.8),
+        0 0 0 1px rgba(255,255,255,0.04);
+      cursor: default;
+      animation: shatter 0.35s ease forwards;
+    }
+
+    .marble.removed::after { display: none; }
+
+    @keyframes shatter {
+      0%   { transform: scale(1); opacity: 1; }
+      30%  { transform: scale(1.15); }
+      60%  { transform: scale(0.85); opacity: 0.7; }
+      100% { transform: scale(0.75); opacity: 1; }
+    }
+
+    /* Selected marble ring */
+    .cell.selected-cell .marble:not(.removed) {
+      animation: selected-pulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes selected-pulse {
+      0%, 100% { box-shadow: inset -4px -6px 10px rgba(0,0,0,0.5), 0 4px 12px rgba(58,140,255,0.4), 0 0 0 3px rgba(58,140,255,0.5); }
+      50%       { box-shadow: inset -4px -6px 10px rgba(0,0,0,0.5), 0 4px 20px rgba(58,140,255,0.6), 0 0 0 5px rgba(58,140,255,0.25); }
+    }
+
+    /* Row highlight ring color */
+    .cell.row-hover    .marble:not(.removed) { box-shadow: inset -4px -6px 10px rgba(0,0,0,0.5), 0 4px 14px rgba(80,210,255,0.4), 0 0 0 2px var(--row-ring); }
+    .cell.col-hover    .marble:not(.removed) { box-shadow: inset -4px -6px 10px rgba(0,0,0,0.5), 0 4px 14px rgba(100,255,160,0.4), 0 0 0 2px var(--col-ring); }
+    .cell.diag-hover   .marble:not(.removed) { box-shadow: inset -4px -6px 10px rgba(0,0,0,0.5), 0 4px 14px rgba(255,200,80,0.4), 0 0 0 2px var(--diag1-ring); }
+    .cell.diag2-hover  .marble:not(.removed) { box-shadow: inset -4px -6px 10px rgba(0,0,0,0.5), 0 4px 14px rgba(200,80,255,0.4), 0 0 0 2px var(--diag2-ring); }
+
+    /* Controls */
+    .controls-panel {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      min-height: 120px;
+      margin-bottom: 10px;
+    }
+
+    .mode-display {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .mode-chip {
+      padding: 7px 14px;
+      border-radius: 100px;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-family: 'Space Mono', monospace;
+      border: 1px solid;
+      opacity: 0.35;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .mode-chip:hover { opacity: 0.65; }
+
+    .mode-chip.row    { color: var(--row-ring);   border-color: var(--row-ring);   background: rgba(80,210,255,0.08); }
+    .mode-chip.col    { color: var(--col-ring);   border-color: var(--col-ring);   background: rgba(100,255,160,0.08); }
+    .mode-chip.diag1  { color: var(--diag1-ring); border-color: var(--diag1-ring); background: rgba(255,200,80,0.08); }
+    .mode-chip.diag2  { color: var(--diag2-ring); border-color: var(--diag2-ring); background: rgba(200,80,255,0.08); }
+
+    .mode-chip.active {
+      opacity: 1;
+      box-shadow: 0 0 14px currentColor;
+    }
+
+    .mode-chip.locked {
+      opacity: 0.15 !important;
+      cursor: not-allowed;
+      text-decoration: line-through;
+    }
+
+    .mode-hint {
+      font-size: 11px;
+      color: var(--text-dim);
+      text-align: center;
+      letter-spacing: 0.06em;
+    }
+
+    /* Action button */
+    .btn-commit {
+      padding: 14px 36px;
+      font-family: 'Orbitron', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      border: none;
+      border-radius: 100px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.2s ease;
+      background: linear-gradient(135deg, #3a8cff, #1a5aff);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(58,140,255,0.4);
+    }
+
+    .btn-commit::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.2), transparent);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .btn-commit:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(58,140,255,0.55); }
+    .btn-commit:hover::before { opacity: 1; }
+    .btn-commit:active { transform: translateY(0); }
+
+    .btn-commit.hidden { display: none; }
+
+    .btn-commit.p2-turn {
+      background: linear-gradient(135deg, #ff5e8a, #cc2255);
+      box-shadow: 0 4px 20px rgba(255,94,138,0.4);
+    }
+
+    .btn-commit.p2-turn:hover { box-shadow: 0 8px 28px rgba(255,94,138,0.55); }
+
+    /* Restart */
+    .btn-restart {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 10px 24px;
+      border-radius: 100px;
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-restart:hover {
+      border-color: rgba(255,255,255,0.25);
+      color: var(--text);
+      background: rgba(255,255,255,0.04);
+    }
+
+    /* Instruction hint at bottom */
+    .tap-hint {
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 0.1em;
+      text-align: center;
+      margin-top: 4px;
+    }
+
+    /* Shield marble */
+    .marble.shield-p1 {
+      background: radial-gradient(circle at 35% 30%,
+        rgba(255,255,255,0.95) 0%,
+        rgba(180,210,255,0.7) 15%,
+        #3a8cff 45%,
+        #1a3a8a 80%,
+        #0a1540 100%);
+      box-shadow:
+        inset -4px -6px 10px rgba(0,0,0,0.5),
+        0 0 0 3px var(--p1),
+        0 0 16px var(--p1-glow),
+        0 0 32px rgba(58,140,255,0.3);
+      animation: shield-pulse-p1 2s ease-in-out infinite;
+    }
+    .marble.shield-p2 {
+      background: radial-gradient(circle at 35% 30%,
+        rgba(255,255,255,0.95) 0%,
+        rgba(255,180,200,0.7) 15%,
+        #ff5e8a 45%,
+        #8a1a3a 80%,
+        #400a15 100%);
+      box-shadow:
+        inset -4px -6px 10px rgba(0,0,0,0.5),
+        0 0 0 3px var(--p2),
+        0 0 16px var(--p2-glow),
+        0 0 32px rgba(255,94,138,0.3);
+      animation: shield-pulse-p2 2s ease-in-out infinite;
+    }
+    @keyframes shield-pulse-p1 {
+      0%,100% { box-shadow: inset -4px -6px 10px rgba(0,0,0,0.5), 0 0 0 3px var(--p1), 0 0 16px var(--p1-glow); }
+      50%     { box-shadow: inset -4px -6px 10px rgba(0,0,0,0.5), 0 0 0 4px var(--p1), 0 0 28px var(--p1-glow), 0 0 40px rgba(58,140,255,0.2); }
+    }
+    @keyframes shield-pulse-p2 {
+      0%,100% { box-shadow: inset -4px -6px 10px rgba(0,0,0,0.5), 0 0 0 3px var(--p2), 0 0 16px var(--p2-glow); }
+      50%     { box-shadow: inset -4px -6px 10px rgba(0,0,0,0.5), 0 0 0 4px var(--p2), 0 0 28px var(--p2-glow), 0 0 40px rgba(255,94,138,0.2); }
+    }
+    .marble.shield-p1.removed, .marble.shield-p2.removed {
+      animation: none;
+    }
+
+    /* Shield pick phase */
+    .phase-banner {
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      text-align: center;
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      margin-bottom: 14px;
+      border: 1px solid;
+      display: none;
+    }
+    .phase-banner.visible { display: block; }
+    .phase-banner.p1-pick {
+      background: rgba(58,140,255,0.1);
+      border-color: rgba(58,140,255,0.4);
+      color: var(--p1);
+    }
+    .phase-banner.p2-pick {
+      background: rgba(255,94,138,0.1);
+      border-color: rgba(255,94,138,0.4);
+      color: var(--p2);
+    }
+    .phase-banner strong { font-family: 'Orbitron', monospace; font-size: 13px; }
+
+    /* Sudden death warning */
+    .death-badge {
+      display: none;
+      align-items: center;
+      gap: 5px;
+      background: rgba(255,60,60,0.12);
+      border: 1px solid rgba(255,60,60,0.4);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 11px;
+      color: #ff4040;
+      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+      width: 100%;
+      justify-content: center;
+      animation: flash-red 1s ease-in-out infinite;
+    }
+    .death-badge.visible { display: flex; }
+    @keyframes flash-red {
+      0%,100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Cell picking highlight */
+    .cell.pick-hover .marble:not(.shield-p1):not(.shield-p2) {
+      box-shadow:
+        inset -4px -6px 10px rgba(0,0,0,0.5),
+        0 0 0 3px rgba(255,255,255,0.5),
+        0 0 20px rgba(255,255,255,0.2);
+      transform: scale(1.1);
+    }
+
+    /* Responsive scaling */
+    @media (max-width: 600px) {
+      :root { --cell-size: clamp(32px, 10.5vw, 58px); }
+      .marble { width: clamp(22px, 7vw, 38px); height: clamp(22px, 7vw, 38px); }
+    }
+
+    @media (max-width: 380px) {
+      :root { --cell-size: clamp(30px, 9.5vw, 40px); }
+    }
+
+    /* Win overlay */
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(7,8,15,0.88);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 20px;
+    }
+
+    .overlay.visible { display: flex; animation: overlay-in 0.4s ease; }
+
+    @keyframes overlay-in {
+      from { opacity: 0; transform: scale(0.97); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    .overlay-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 36px 40px;
+      text-align: center;
+      max-width: 340px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.7);
+    }
+
+    .overlay-skull { font-size: 52px; line-height: 1; }
+
+    .overlay-title {
+      font-family: 'Orbitron', monospace;
+      font-size: clamp(18px, 5vw, 26px);
+      font-weight: 900;
+      letter-spacing: 0.1em;
+    }
+
+    .overlay-sub {
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+
+    .overlay-winner {
+      font-family: 'Orbitron', monospace;
+      font-size: clamp(24px, 7vw, 38px);
+      font-weight: 900;
+    }
+
+    .overlay-winner.p1 { color: var(--p1); text-shadow: 0 0 30px var(--p1-glow); }
+    .overlay-winner.p2 { color: var(--p2); text-shadow: 0 0 30px var(--p2-glow); }
+
+    .btn-play-again {
+      padding: 14px 40px;
+      font-family: 'Orbitron', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      border: none;
+      border-radius: 100px;
+      cursor: pointer;
+      background: linear-gradient(135deg, #3a8cff, #1a5aff);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(58,140,255,0.4);
+      transition: all 0.2s;
+      margin-top: 6px;
+    }
+
+    .btn-play-again:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(58,140,255,0.55);
+    }
+
+    /* Rules panel */
+    .rules-toggle {
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 0.12em;
+      cursor: pointer;
+      text-transform: uppercase;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      margin-top: 6px;
+      background: none;
+      border: none;
+      font-family: 'Space Mono', monospace;
+      transition: color 0.2s;
+    }
+
+    .rules-toggle:hover { color: var(--text); }
+
+    .rules-panel {
+      width: 100%;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.4s ease;
+    }
+
+    .rules-panel.open { max-height: 500px; }
+
+    .rules-inner {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+      margin-top: 10px;
+      font-size: 12px;
+      line-height: 1.7;
+      color: rgba(232,234,246,0.75);
+    }
+
+    .rules-inner h3 {
+      font-family: 'Orbitron', monospace;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      color: var(--text);
+      margin-bottom: 8px;
+      margin-top: 14px;
+    }
+
+    .rules-inner h3:first-child { margin-top: 0; }
+  </style>
 </head>
 <body>
 
-  <h1>Lone Marble</h1>
-  <h2 id="turn">Player 1</h2>
+<div class="overlay" id="winOverlay">
+  <div class="overlay-card">
+    <div class="overlay-skull">💀</div>
+    <div class="overlay-title">ELIMINATED</div>
+    <div class="overlay-sub">Took the last marble.</div>
+    <div class="overlay-winner" id="winnerText">PLAYER 1</div>
+    <div class="overlay-sub" id="winnerSub">PLAYER 2 WINS!</div>
+    <button class="btn-play-again" onclick="resetGame()">Play Again</button>
+  </div>
+</div>
 
-  <div id="board"></div>
-
-  <div id="controls" class="hidden">
-    <p id="modeLabel"></p>
-    <button onclick="commitMove()">Remove Selected Line</button>
+<div class="wrapper">
+  <div class="header">
+    <h1>Lone Marble</h1>
+    <div class="subtitle">Abstract Strategy · Two Players</div>
   </div>
 
-  <button class="restart" onclick="resetGame()">Restart Game</button>
+  <div class="players">
+    <div class="player-card p1 active" id="card1">
+      <div class="player-label">Player 1</div>
+      <div class="player-name">BLAZE</div>
+      <div class="turn-indicator">
+        <div class="turn-dot"></div>
+        <div class="player-status" id="status1">Your turn</div>
+      </div>
+    </div>
+    <div class="player-card p2" id="card2">
+      <div class="player-label">Player 2</div>
+      <div class="player-name">PULSE</div>
+      <div class="turn-indicator">
+        <div class="turn-dot"></div>
+        <div class="player-status" id="status2">Waiting</div>
+      </div>
+    </div>
+  </div>
 
-  <script src="script.js"></script>
+  <div class="phase-banner" id="phaseBanner"></div>
+
+  <div class="lock-badge" id="lockBadge">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+    <span id="lockText">ROW locked by previous player</span>
+  </div>
+
+  <div class="board-wrap">
+    <div id="board"></div>
+  </div>
+
+  <div class="controls-panel">
+    <div class="mode-display" id="modeDisplay">
+      <div class="mode-chip row" id="chip-row" onclick="selectMode(0)">Row</div>
+      <div class="mode-chip col" id="chip-col" onclick="selectMode(1)">Column</div>
+      <div class="mode-chip diag1" id="chip-diag1" onclick="selectMode(2)">Diag ↘</div>
+      <div class="mode-chip diag2" id="chip-diag2" onclick="selectMode(3)">Diag ↙</div>
+    </div>
+
+    <div class="mode-hint" id="modeHint">Tap a marble to begin</div>
+
+    <div class="death-badge" id="deathBadge">
+      ☠ SUDDEN DEATH — removing a 1-marble line loses instantly!
+    </div>
+
+    <button class="btn-commit hidden" id="commitBtn" onclick="commitMove()">
+      Remove Line
+    </button>
+  </div>
+
+  <button class="btn-restart" onclick="resetGame()">↺ Restart</button>
+
+  <button class="rules-toggle" onclick="toggleRules()">How to Play</button>
+  <div class="rules-panel" id="rulesPanel">
+    <div class="rules-inner">
+      <h3>SHIELD MARBLE</h3>
+      Before the game, each player secretly picks one marble to protect. Shielded marbles glow with your color and <strong>cannot be removed</strong> by any line. Choose wisely — it can anchor a key intersection.
+      <h3>SUDDEN DEATH</h3>
+      After turn 5, any move that removes a line containing only <strong>1 marble</strong> causes an instant loss for the player who made it. Plan your endgame carefully!
+      <h3>OBJECTIVE</h3>
+      Force your opponent to take the final marble. The player who removes the last marble loses.
+      <h3>YOUR TURN</h3>
+      1. Tap any marble to select it.<br>
+      2. Choose a line type: Row, Column, or Diagonal.<br>
+      3. Press <strong>Remove Line</strong> to remove all marbles in that line.
+      <h3>LOCK RULE</h3>
+      You cannot use the same line type as the previous player — unless it's the only option left.
+      <h3>TIPS</h3>
+      Think two moves ahead. Control which lines you leave available for your opponent.
+    </div>
+  </div>
+</div>
+
+<script>
+// ── NEW RULES ──────────────────────────────────────────────────────────
+// SHIELD MARBLE: each player picks one marble before play; it can't be removed.
+// SUDDEN DEATH:  after turn 5, removing a line with only 1 marble = instant loss.
+// ───────────────────────────────────────────────────────────────────────
+
+const STAR_MASK = [
+  [0,0,0,1,1,1,0,0,0],
+  [0,0,1,1,1,1,1,0,0],
+  [0,1,1,1,1,1,1,1,0],
+  [1,1,1,1,1,1,1,1,1],
+  [0,1,1,1,1,1,1,1,0],
+  [0,0,1,1,1,1,1,0,0],
+  [0,0,0,1,1,1,0,0,0],
+];
+
+const SIZE = 9;
+const boardDiv = document.getElementById("board");
+const commitBtn = document.getElementById("commitBtn");
+const modeHint = document.getElementById("modeHint");
+const lockBadge = document.getElementById("lockBadge");
+const lockText = document.getElementById("lockText");
+const phaseBanner = document.getElementById("phaseBanner");
+const deathBadge = document.getElementById("deathBadge");
+
+let board = [];
+let currentPlayer = 1;
+let selected = null;
+let selectionMode = -1;
+let lastMoveType = null;
+
+// New rule state
+let gamePhase = "shield-pick"; // "shield-pick" | "play"
+let shieldPickStep = 0;        // 0 = P1 picking, 1 = P2 picking
+let shields = { 1: null, 2: null }; // {r,c} for each player
+let turnCount = 0;
+
+const chips = [
+  document.getElementById("chip-row"),
+  document.getElementById("chip-col"),
+  document.getElementById("chip-diag1"),
+  document.getElementById("chip-diag2"),
+];
+const typeNames = ["row", "col", "diag1", "diag2"];
+const modeNames = ["Row", "Column", "Diagonal ↘", "Diagonal ↙"];
+
+function initBoard() {
+  boardDiv.innerHTML = "";
+  board = [];
+  gamePhase = "shield-pick";
+  shieldPickStep = 0;
+  shields = { 1: null, 2: null };
+  turnCount = 0;
+  deathBadge.classList.remove("visible");
+
+  for (let r = 0; r < STAR_MASK.length; r++) {
+    board[r] = [];
+    for (let c = 0; c < SIZE; c++) {
+      const cell = document.createElement("div");
+      cell.dataset.row = r;
+      cell.dataset.col = c;
+
+      if (STAR_MASK[r][c] === 1) {
+        board[r][c] = true;
+        cell.className = "cell";
+        const marble = document.createElement("div");
+        marble.className = "marble";
+        cell.appendChild(marble);
+        cell.onclick = () => handleCellClick(r, c);
+        cell.onmouseenter = () => { if (gamePhase === "shield-pick") cell.classList.add("pick-hover"); };
+        cell.onmouseleave = () => cell.classList.remove("pick-hover");
+      } else {
+        board[r][c] = null;
+        cell.className = "cell inactive";
+      }
+
+      boardDiv.appendChild(cell);
+    }
+  }
+
+  resetSelection();
+  updateChipLocks();
+  showShieldPickPhase();
+}
+
+function showShieldPickPhase() {
+  phaseBanner.className = "phase-banner visible " + (shieldPickStep === 0 ? "p1-pick" : "p2-pick");
+  const pName = shieldPickStep === 0 ? "BLAZE (P1)" : "PULSE (P2)";
+  const pColor = shieldPickStep === 0 ? "blue" : "pink";
+  phaseBanner.innerHTML = `<strong>${pName}</strong> — tap any marble to set it as your Shield. It will glow ${pColor} and can never be removed.`;
+  modeHint.textContent = shieldPickStep === 0 ? "Player 1: choose your shield marble" : "Player 2: choose your shield marble";
+  // Hide game controls during pick
+  commitBtn.classList.add("hidden");
+  document.getElementById("modeDisplay").style.opacity = "0.3";
+  document.getElementById("modeDisplay").style.pointerEvents = "none";
+}
+
+function handleCellClick(r, c) {
+  if (gamePhase === "shield-pick") {
+    pickShield(r, c);
+  } else {
+    selectMarble(r, c);
+  }
+}
+
+function pickShield(r, c) {
+  if (board[r][c] !== true) return;
+  const marble = getCell(r, c).querySelector(".marble");
+
+  // Unmark any previous temp pick for this step
+  if (shieldPickStep === 0 && shields[1]) {
+    getCell(shields[1].r, shields[1].c).querySelector(".marble")?.classList.remove("shield-p1");
+  }
+  if (shieldPickStep === 1 && shields[2]) {
+    getCell(shields[2].r, shields[2].c).querySelector(".marble")?.classList.remove("shield-p2");
+  }
+
+  if (shieldPickStep === 0) {
+    shields[1] = { r, c };
+    marble.classList.add("shield-p1");
+    // Move to P2
+    shieldPickStep = 1;
+    showShieldPickPhase();
+    updatePlayerUI(); // keep P1 active card but hint changes
+  } else {
+    // Avoid same marble
+    if (shields[1].r === r && shields[1].c === c) {
+      modeHint.textContent = "⚠ That's Player 1's shield! Pick a different marble.";
+      return;
+    }
+    shields[2] = { r, c };
+    marble.classList.add("shield-p2");
+    // Start game
+    gamePhase = "play";
+    phaseBanner.classList.remove("visible");
+    document.getElementById("modeDisplay").style.opacity = "";
+    document.getElementById("modeDisplay").style.pointerEvents = "";
+    modeHint.textContent = "Tap a marble to begin";
+    updateChipLocks();
+  }
+}
+
+function isShielded(r, c) {
+  return (shields[1] && shields[1].r === r && shields[1].c === c) ||
+         (shields[2] && shields[2].r === r && shields[2].c === c);
+}
+
+function selectMarble(r, c) {
+  if (gamePhase !== "play") return;
+  if (board[r][c] !== true) return;
+
+  if (!selected || selected.r !== r || selected.c !== c) {
+    // New marble selected — pick first available mode
+    selected = { r, c };
+    selectionMode = firstAvailableMode();
+    getCell(r, c).classList.add("selected-cell");
+  } else {
+    // Cycle to next available mode
+    selectionMode = nextAvailableMode(selectionMode);
+    if (selectionMode === -1) {
+      resetSelection();
+      return;
+    }
+  }
+
+  updatePreview();
+  updateCommitBtn();
+  updateChipUI();
+  updateHint();
+}
+
+function selectMode(modeIdx) {
+  if (!selected) return;
+  if (typeNames[modeIdx] === lastMoveType && otherMoveExists(lastMoveType)) return;
+  selectionMode = modeIdx;
+  updatePreview();
+  updateCommitBtn();
+  updateChipUI();
+  updateHint();
+}
+
+function firstAvailableMode() {
+  for (let i = 0; i < 4; i++) {
+    if (typeNames[i] !== lastMoveType || !otherMoveExists(lastMoveType)) return i;
+  }
+  return 0;
+}
+
+function nextAvailableMode(current) {
+  let next = current + 1;
+  while (next <= 3) {
+    if (typeNames[next] !== lastMoveType || !otherMoveExists(lastMoveType)) return next;
+    next++;
+  }
+  return -1; // wrap => deselect
+}
+
+function updateChipUI() {
+  chips.forEach((chip, i) => {
+    chip.classList.remove("active", "locked");
+    if (i === selectionMode) chip.classList.add("active");
+    if (typeNames[i] === lastMoveType && otherMoveExists(lastMoveType)) chip.classList.add("locked");
+  });
+}
+
+function updateChipLocks() {
+  chips.forEach((chip, i) => {
+    chip.classList.remove("locked");
+    if (typeNames[i] === lastMoveType && otherMoveExists(lastMoveType)) chip.classList.add("locked");
+  });
+
+  if (lastMoveType) {
+    const names = { row: "ROW", col: "COLUMN", diag1: "DIAG ↘", diag2: "DIAG ↙" };
+    lockText.textContent = `${names[lastMoveType]} locked — previous player's move`;
+    lockBadge.classList.add("visible");
+  } else {
+    lockBadge.classList.remove("visible");
+  }
+}
+
+function updateCommitBtn() {
+  if (selected && selectionMode >= 0) {
+    commitBtn.classList.remove("hidden");
+    commitBtn.classList.toggle("p2-turn", currentPlayer === 2);
+  } else {
+    commitBtn.classList.add("hidden");
+  }
+}
+
+function updateHint() {
+  if (!selected) {
+    modeHint.textContent = "Tap a marble to begin";
+    return;
+  }
+  modeHint.textContent = `${modeNames[selectionMode]} selected — tap chips to switch mode`;
+}
+
+function updatePreview() {
+  clearPreview();
+  if (!selected || selectionMode < 0) return;
+  const { r, c } = selected;
+  const classes = ["row-hover", "col-hover", "diag-hover", "diag2-hover"];
+  const cl = classes[selectionMode];
+
+  let lineMarbles = [];
+
+  if (selectionMode === 0) {
+    for (let i = 0; i < SIZE; i++) if (board[r][i] !== null) { getCell(r, i).classList.add(cl); if (board[r][i] === true && !isShielded(r,i)) lineMarbles.push([r,i]); }
+  } else if (selectionMode === 1) {
+    for (let i = 0; i < STAR_MASK.length; i++) if (board[i][c] !== null) { getCell(i, c).classList.add(cl); if (board[i][c] === true && !isShielded(i,c)) lineMarbles.push([i,c]); }
+  } else if (selectionMode === 2) {
+    const diff = r - c;
+    for (let i = 0; i < STAR_MASK.length; i++)
+      for (let j = 0; j < SIZE; j++)
+        if (i - j === diff && board[i][j] !== null) { getCell(i, j).classList.add(cl); if (board[i][j] === true && !isShielded(i,j)) lineMarbles.push([i,j]); }
+  } else if (selectionMode === 3) {
+    const sum = r + c;
+    for (let i = 0; i < STAR_MASK.length; i++)
+      for (let j = 0; j < SIZE; j++)
+        if (i + j === sum && board[i][j] !== null) { getCell(i, j).classList.add(cl); if (board[i][j] === true && !isShielded(i,j)) lineMarbles.push([i,j]); }
+  }
+
+  // Sudden death warning: after turn 5, if this line removes exactly 1 marble
+  if (turnCount >= 5 && lineMarbles.length === 1) {
+    deathBadge.classList.add("visible");
+  } else {
+    deathBadge.classList.remove("visible");
+  }
+}
+
+function clearPreview() {
+  for (let r = 0; r < STAR_MASK.length; r++)
+    for (let c = 0; c < SIZE; c++)
+      if (board[r][c] !== null) {
+        const cell = getCell(r, c);
+        cell.classList.remove("row-hover", "col-hover", "diag-hover", "diag2-hover");
+      }
+}
+
+// function commitMove() {
+//   if (!selected || selectionMode < 0) return;
+//   const { r, c } = selected;
+//   const currentMoveType = typeNames[selectionMode];
+
+//   if (lastMoveType === currentMoveType && otherMoveExists(currentMoveType)) {
+//     shakeCommitBtn();
+//     modeHint.textContent = "⚠ Lock Rule: choose a different line type!";
+//     return;
+//   }
+
+//   // Build removal list — exclude shielded marbles
+//   const toRemove = [];
+//   if (selectionMode === 0) {
+//     for (let i = 0; i < SIZE; i++) if (board[r][i] === true && !isShielded(r,i)) toRemove.push([r, i]);
+//   } else if (selectionMode === 1) {
+//     for (let i = 0; i < STAR_MASK.length; i++) if (board[i][c] === true && !isShielded(i,c)) toRemove.push([i, c]);
+//   } else if (selectionMode === 2) {
+//     const diff = r - c;
+//     for (let i = 0; i < STAR_MASK.length; i++)
+//       for (let j = 0; j < SIZE; j++)
+//         if (i - j === diff && board[i][j] === true && !isShielded(i,j)) toRemove.push([i, j]);
+//   } else if (selectionMode === 3) {
+//     const sum = r + c;
+//     for (let i = 0; i < STAR_MASK.length; i++)
+//       for (let j = 0; j < SIZE; j++)
+//         if (i + j === sum && board[i][j] === true && !isShielded(i,j)) toRemove.push([i, j]);
+//   }
+
+//   // If line is entirely shielded / empty, block move
+//   if (toRemove.length === 0) {
+//     shakeCommitBtn();
+//     modeHint.textContent = "⚠ That line is fully blocked by shields!";
+//     return;
+//   }
+
+//   // ── SUDDEN DEATH CHECK ──
+//   if (turnCount >= 5 && toRemove.length === 1) {
+//     // Instant loss for this player
+//     toRemove.forEach(([ri, ci], idx) => {
+//       setTimeout(() => removeCell(ri, ci), idx * 40);
+//     });
+//     setTimeout(() => triggerWin(currentPlayer, "sudden-death"), toRemove.length * 40 + 100);
+//     return;
+//   }
+
+//   // Normal removal
+//   toRemove.forEach(([ri, ci], idx) => {
+//     setTimeout(() => removeCell(ri, ci), idx * 40);
+//   });
+
+//   lastMoveType = currentMoveType;
+//   turnCount++;
+
+//   const remaining = countMarbles() - toRemove.length;
+
+//   setTimeout(() => {
+//     if (remaining <= 0) {
+//       triggerWin(currentPlayer);
+//       return;
+//     }
+//     currentPlayer = currentPlayer === 1 ? 2 : 1;
+//     updatePlayerUI();
+//     updateChipLocks();
+//     resetSelection();
+//   }, toRemove.length * 40 + 100);
+// }
+function commitMove() {
+  if (!selected || selectionMode < 0) return;
+
+  const { r, c } = selected;
+  const currentMoveType = typeNames[selectionMode];
+
+  // LOCK RULE
+  if (lastMoveType === currentMoveType && otherMoveExists(currentMoveType)) {
+    shakeCommitBtn();
+    modeHint.textContent = "⚠ Lock Rule: choose a different line type!";
+    return;
+  }
+
+  // BUILD REMOVAL LIST (excluding shields)
+  const toRemove = [];
+
+  if (selectionMode === 0) {
+    for (let i = 0; i < SIZE; i++)
+      if (board[r][i] === true && !isShielded(r, i)) toRemove.push([r, i]);
+  }
+
+  else if (selectionMode === 1) {
+    for (let i = 0; i < STAR_MASK.length; i++)
+      if (board[i][c] === true && !isShielded(i, c)) toRemove.push([i, c]);
+  }
+
+  else if (selectionMode === 2) {
+    const diff = r - c;
+    for (let i = 0; i < STAR_MASK.length; i++)
+      for (let j = 0; j < SIZE; j++)
+        if (i - j === diff && board[i][j] === true && !isShielded(i, j))
+          toRemove.push([i, j]);
+  }
+
+  else if (selectionMode === 3) {
+    const sum = r + c;
+    for (let i = 0; i < STAR_MASK.length; i++)
+      for (let j = 0; j < SIZE; j++)
+        if (i + j === sum && board[i][j] === true && !isShielded(i, j))
+          toRemove.push([i, j]);
+  }
+
+  // BLOCK EMPTY MOVE
+  if (toRemove.length === 0) {
+    shakeCommitBtn();
+    modeHint.textContent = "⚠ That line is fully blocked by shields!";
+    return;
+  }
+
+  // SUDDEN DEATH
+  if (turnCount >= 5 && toRemove.length === 1) {
+    toRemove.forEach(([ri, ci], idx) => {
+      setTimeout(() => removeCell(ri, ci), idx * 40);
+    });
+
+    setTimeout(() => {
+      triggerWin(currentPlayer, "sudden-death");
+    }, toRemove.length * 40 + 100);
+
+    return;
+  }
+
+  // REMOVE MARBLES (animation)
+  toRemove.forEach(([ri, ci], idx) => {
+    setTimeout(() => removeCell(ri, ci), idx * 40);
+  });
+
+  lastMoveType = currentMoveType;
+  turnCount++;
+
+  // ✅ AFTER REMOVAL → CHECK GAME STATE
+  setTimeout(() => {
+
+    // Count ONLY removable marbles (ignore shields)
+    let remainingRemovable = 0;
+
+    for (let r = 0; r < STAR_MASK.length; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        if (board[r][c] === true && !isShielded(r, c)) {
+          remainingRemovable++;
+        }
+      }
+    }
+
+    // 🏁 GAME OVER CONDITION
+    if (remainingRemovable === 0) {
+      triggerWin(currentPlayer, "no-moves");
+      return;
+    }
+
+    // CONTINUE GAME
+    currentPlayer = currentPlayer === 1 ? 2 : 1;
+    updatePlayerUI();
+    updateChipLocks();
+    resetSelection();
+
+  }, toRemove.length * 40 + 100);
+}
+
+function countMarbles() {
+  let n = 0;
+  for (let r = 0; r < STAR_MASK.length; r++)
+    for (let c = 0; c < SIZE; c++)
+      if (board[r][c] === true) n++;
+  return n;
+}
+
+function triggerWin(loser, reason) {
+  const winner = loser === 1 ? 2 : 1;
+  const winnerNames = ["BLAZE", "PULSE"];
+  const loserNames = ["BLAZE", "PULSE"];
+  document.getElementById("winnerText").textContent = `${loserNames[loser-1]} LOST`;
+  document.getElementById("winnerText").className = `overlay-winner p${loser}`;
+  if (reason === "sudden-death") {
+    document.getElementById("winnerSub").textContent = `☠ Sudden Death — removed a 1-marble line! ${winnerNames[winner-1]} WINS!`;
+  } else {
+    document.getElementById("winnerSub").textContent = `${winnerNames[winner-1]} WINS THE ROUND!`;
+  }
+  document.getElementById("winOverlay").classList.add("visible");
+}
+
+function removeCell(r, c) {
+  if (board[r][c] === true && !isShielded(r, c)) {
+    board[r][c] = false;
+    const marble = getCell(r, c).querySelector(".marble");
+    if (marble) marble.classList.add("removed");
+  }
+}
+
+function getCell(r, c) {
+  return boardDiv.children[r * SIZE + c];
+}
+
+function resetSelection() {
+  if (selected) {
+    const cell = getCell(selected.r, selected.c);
+    if (cell) cell.classList.remove("selected-cell");
+  }
+  selected = null;
+  selectionMode = -1;
+  clearPreview();
+  commitBtn.classList.add("hidden");
+  chips.forEach(ch => ch.classList.remove("active"));
+  deathBadge.classList.remove("visible");
+  modeHint.textContent = gamePhase === "play" ? "Tap a marble to begin" : "";
+}
+
+function updatePlayerUI() {
+  document.getElementById("card1").classList.toggle("active", currentPlayer === 1);
+  document.getElementById("card2").classList.toggle("active", currentPlayer === 2);
+  document.getElementById("status1").textContent = currentPlayer === 1 ? "Your turn" : "Waiting";
+  document.getElementById("status2").textContent = currentPlayer === 2 ? "Your turn" : "Waiting";
+}
+
+function shakeCommitBtn() {
+  commitBtn.style.animation = "none";
+  commitBtn.offsetHeight;
+  commitBtn.style.animation = "shake 0.3s ease";
+  setTimeout(() => { commitBtn.style.animation = ""; }, 350);
+}
+
+function otherMoveExists(blockedType) {
+  const types = ["row", "col", "diag1", "diag2"];
+  for (let type of types) {
+    if (type === blockedType) continue;
+    if (moveTypeHasAvailableLine(type)) return true;
+  }
+  return false;
+}
+
+function moveTypeHasAvailableLine(type) {
+  for (let r = 0; r < STAR_MASK.length; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      if (board[r][c] === true) {
+        if (type === "row" && board[r].some(cell => cell === true)) return true;
+        if (type === "col") {
+          for (let i = 0; i < STAR_MASK.length; i++) if (board[i][c] === true) return true;
+        }
+        if (type === "diag1") {
+          const diff = r - c;
+          for (let i = 0; i < STAR_MASK.length; i++)
+            for (let j = 0; j < SIZE; j++)
+              if (i - j === diff && board[i][j] === true) return true;
+        }
+        if (type === "diag2") {
+          const sum = r + c;
+          for (let i = 0; i < STAR_MASK.length; i++)
+            for (let j = 0; j < SIZE; j++)
+              if (i + j === sum && board[i][j] === true) return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+function resetGame() {
+  document.getElementById("winOverlay").classList.remove("visible");
+  currentPlayer = 1;
+  lastMoveType = null;
+  turnCount = 0;
+  gamePhase = "shield-pick";
+  shields = { 1: null, 2: null };
+  updatePlayerUI();
+  initBoard();
+}
+
+function toggleRules() {
+  const panel = document.getElementById("rulesPanel");
+  panel.classList.toggle("open");
+}
+
+function countRemovableMarbles() {
+  let count = 0;
+
+  for (let r = 0; r < STAR_MASK.length; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      if (board[r][c] === true && !isShielded(r, c)) {
+        count++;
+      }
+    }
+  }
+
+  return count;
+}
+
+// Add shake keyframes
+const style = document.createElement("style");
+style.textContent = `@keyframes shake {
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-6px)}
+  40%{transform:translateX(6px)}
+  60%{transform:translateX(-4px)}
+  80%{transform:translateX(4px)}
+}`;
+document.head.appendChild(style);
+
+initBoard();
+</script>
 </body>
 </html>
